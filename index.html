@@ -3,69 +3,87 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VLM aerial grounding — all 300 queries · Jetson Orin Nano 8 GB</title>
+<title>VLM aerial grounding on a Jetson Orin Nano 8 GB — all 300 queries</title>
 <style>
-  :root{--navy:#123A5E;--blue:#378ADD;--light:#E9F1F8;--gold:#2ECC40;--orange:#D85A30;}
+  :root{--navy:#123A5E;--blue:#378ADD;--light:#E9F1F8;--gold:#2ECC40;--orange:#D85A30;--amber:#E8B03A;}
   *{box-sizing:border-box}
-  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--navy);
-       background:var(--light);}
-  header{background:var(--navy);color:#fff;padding:18px 22px;}
-  header h1{margin:0 0 4px;font-size:20px;}
-  header p{margin:0;font-size:13px;opacity:.85;}
-  .bar{position:sticky;top:0;z-index:5;background:#fff;border-bottom:2px solid var(--blue);
-       padding:10px 16px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;
-       box-shadow:0 2px 6px rgba(0,0,0,.06);}
-  .bar b{font-size:13px;margin-right:4px;}
-  .bar button{border:1.5px solid var(--blue);background:#fff;color:var(--navy);border-radius:16px;
-       padding:5px 13px;font-size:13px;cursor:pointer;}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--navy);background:var(--light);}
+  header{background:var(--navy);color:#fff;padding:20px 22px;}
+  header h1{margin:0 0 6px;font-size:21px;}
+  header p{margin:0;font-size:14px;opacity:.9;line-height:1.45;max-width:1000px;}
+  .about{background:#fff;border-bottom:1px solid #cdd9e6;padding:14px 22px;}
+  .stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px;}
+  .stat{border:1.5px solid #cdd9e6;border-radius:10px;padding:8px 14px;min-width:150px;}
+  .stat .big{font-size:22px;font-weight:700;}
+  .stat .lab{font-size:12px;color:#556;}
+  .note{font-size:13.5px;line-height:1.5;color:#334;max-width:1000px;}
+  .note b{color:var(--navy);}
+  .bar{position:sticky;top:0;z-index:5;background:#fff;border-top:1px solid #cdd9e6;border-bottom:2px solid var(--blue);
+       padding:10px 16px;display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;box-shadow:0 2px 6px rgba(0,0,0,.06);}
+  .bar b{font-size:13px;margin-right:2px;}
+  .bar button{border:1.5px solid var(--blue);background:#fff;color:var(--navy);border-radius:16px;padding:5px 12px;font-size:13px;cursor:pointer;}
   .bar button.on{background:var(--navy);color:#fff;}
   .bar .count{margin-left:auto;font-size:13px;color:#555;}
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;
-        padding:16px;}
-  .card{background:#fff;border:1.5px solid #cdd9e6;border-radius:12px;overflow:hidden;
-        display:flex;flex-direction:column;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center;padding:10px 16px;}
+  .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:16px;}
+  .card{background:#fff;border:1.5px solid #cdd9e6;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;}
   .imgwrap{position:relative;width:100%;background:#0a0a0a;}
   .imgwrap img{width:100%;display:block;}
   .imgwrap svg{position:absolute;inset:0;width:100%;height:100%;}
+  .badge{position:absolute;top:7px;left:7px;font-size:11px;font-weight:700;color:#fff;padding:2px 8px;border-radius:10px;}
   .meta{padding:9px 11px;}
   .prompt{font-size:13.5px;font-weight:600;line-height:1.3;margin-bottom:7px;}
   .tags{font-size:11px;color:#667;margin-bottom:7px;}
   .ious{display:flex;flex-wrap:wrap;gap:6px;}
   .chip{font-size:12px;padding:2px 8px;border-radius:10px;color:#fff;font-weight:600;}
-  .hit{outline:2px solid var(--gold);}
-  footer{padding:16px 22px;font-size:12px;color:#667;}
-  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center;}
-  .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px;}
+  .hit{outline:2px solid var(--gold);outline-offset:1px;}
+  footer{padding:16px 22px;font-size:12px;color:#667;line-height:1.5;}
 </style>
 </head>
 <body>
 <header>
-  <h1>Vision-Language grounding on a Jetson Orin Nano 8 GB — every query</h1>
-  <p>300 aerial queries (150 nadir · 150 oblique). For each: the request, the ground-truth box (green),
-     and what each on-device model drew. IoU shown per model; a hit is IoU ≥ 0.5.</p>
+  <h1>Vision-Language grounding on a Jetson Orin Nano 8 GB — every one of 300 queries</h1>
+  <p>Small (2–3 B) quantized open models, running <b>on the device</b>, no fine-tuning, asked to box an
+     object in aerial imagery. This page shows every query: what was asked, the ground-truth box (green),
+     and what each model drew. The point of the study is not high accuracy — it is <b>where and why these
+     models fail</b> under an 8 GB budget.</p>
 </header>
+
+<div class="about">
+  <div class="stats" id="stats"></div>
+  <div class="note">
+    <b>How to read the numbers.</b> A “hit” means IoU ≥ 0.5 (a tight box). Accuracy here is modest by design —
+    that is the finding. Two things dominate the misses: <b>(1) the failure is object <i>selection</i>, not box
+    precision</b> — models often draw a clean box around the <i>wrong</i> object; and <b>(2) viewpoint matters a lot</b>
+    — nadir (top-down, satellite-like) is far easier than oblique (drone angle), where the satellite-trained
+    specialists (TinyRS) fall to near-zero because they are off-domain. Use the “right area (0.25–0.5)” filter to
+    see the many near-hits that a strict 0.5 cutoff calls “miss”.
+  </div>
+</div>
 
 <div class="bar">
   <b>Viewpoint</b>
   <button data-f="vp" data-v="all" class="on">all</button>
-  <button data-f="vp" data-v="nadir">nadir</button>
-  <button data-f="vp" data-v="oblique">oblique</button>
-  <b style="margin-left:10px">Outcome</b>
+  <button data-f="vp" data-v="nadir">nadir (easier)</button>
+  <button data-f="vp" data-v="oblique">oblique (hardest)</button>
+  <b style="margin-left:8px">Outcome</b>
   <button data-f="oc" data-v="all" class="on">all</button>
-  <button data-f="oc" data-v="hit">any hit</button>
-  <button data-f="oc" data-v="miss">all miss</button>
-  <b style="margin-left:10px">Sort</b>
+  <button data-f="oc" data-v="hit">a model hits ≥0.5</button>
+  <button data-f="oc" data-v="loose">right area 0.25–0.5</button>
+  <button data-f="oc" data-v="miss">all miss &lt;0.25</button>
+  <b style="margin-left:8px">Sort</b>
   <button data-f="so" data-v="id" class="on">by id</button>
   <button data-f="so" data-v="best">best first</button>
   <button data-f="so" data-v="worst">worst first</button>
   <span class="count" id="count"></span>
 </div>
 
-<div class="legend" style="padding:10px 16px">
+<div class="legend">
   <span><span class="sw" style="background:#2ECC40"></span>ground truth</span>
   <span><span class="sw" style="background:#378ADD"></span>Qwen-3B (general)</span>
-  <span><span class="sw" style="background:#123A5E"></span>TinyRS-2B (specialist)</span>
-  <span><span class="sw" style="background:#D85A30"></span>TinyRS-R1 (CoT)</span>
+  <span><span class="sw" style="background:#123A5E"></span>TinyRS-2B (satellite specialist)</span>
+  <span><span class="sw" style="background:#D85A30"></span>TinyRS-R1 (specialist + chain-of-thought)</span>
 </div>
 
 <div class="grid" id="grid"></div>
@@ -75,7 +93,20 @@
 <script>
 const state={vp:"all",oc:"all",so:"id"};
 const DATA=window.GALLERY;
+const best=it=>Math.max(...DATA.models.map(m=>it.models[m].iou));
+
+function pct(a,b){return (100*a/b).toFixed(0);}
+function statsHTML(){
+  const by=vp=>{const s=DATA.items.filter(i=>vp==="all"||i.viewpoint===vp);
+    const hit=s.filter(i=>best(i)>=0.5).length; return {n:s.length,hit};};
+  const A=by("all"),N=by("nadir"),O=by("oblique");
+  const card=(t,o)=>`<div class="stat"><div class="big">${pct(o.hit,o.n)}%</div>
+     <div class="lab">${t} — a model hits (≥0.5)<br>${o.hit} of ${o.n} queries</div></div>`;
+  return card("Overall",A)+card("Nadir (top-down)",N)+card("Oblique (drone angle)",O);
+}
+
 window.addEventListener("DOMContentLoaded",()=>{
+  document.getElementById("stats").innerHTML=statsHTML();
   render();
   document.getElementById("foot").textContent=
     `${DATA.n} queries · Qwen2.5-VL-3B, TinyRS-2B, TinyRS-R1 on a Jetson Orin Nano 8 GB · `+
@@ -88,13 +119,12 @@ document.querySelectorAll(".bar button").forEach(b=>b.onclick=()=>{
   b.classList.add("on"); state[f]=b.dataset.v; render();
 });
 
-function best(it){return Math.max(...DATA.models.map(m=>it.models[m].iou));}
-
 function render(){
   let items=DATA.items.slice();
   if(state.vp!=="all") items=items.filter(i=>i.viewpoint===state.vp);
-  if(state.oc==="hit") items=items.filter(i=>best(i)>=0.5);
-  if(state.oc==="miss") items=items.filter(i=>best(i)<0.5);
+  if(state.oc==="hit")   items=items.filter(i=>best(i)>=0.5);
+  if(state.oc==="loose") items=items.filter(i=>best(i)>=0.25&&best(i)<0.5);
+  if(state.oc==="miss")  items=items.filter(i=>best(i)<0.25);
   if(state.so==="best") items.sort((a,b)=>best(b)-best(a));
   else if(state.so==="worst") items.sort((a,b)=>best(a)-best(b));
   else items.sort((a,b)=>a.id<b.id?-1:1);
@@ -102,24 +132,24 @@ function render(){
   const g=document.getElementById("grid"); g.innerHTML="";
   const C=DATA.colors;
   for(const it of items){
+    const bi=best(it);
+    const [blab,bcol]= bi>=0.5?["hit","#2ECC40"] : bi>=0.25?["right area","#E8B03A"] : ["all miss","#C0392B"];
     const rects=[["gold",it.gold,C.gold,4]];
     for(const m of DATA.models){const b=it.models[m].box; if(b) rects.push([m,b,C[m],3]);}
     const svg=rects.map(([nm,b,c,w])=>{
-      const x=Math.min(b[0],b[2]),y=Math.min(b[1],b[3]),
-            ww=Math.abs(b[2]-b[0]),hh=Math.abs(b[3]-b[1]);
+      const x=Math.min(b[0],b[2]),y=Math.min(b[1],b[3]),ww=Math.abs(b[2]-b[0]),hh=Math.abs(b[3]-b[1]);
       const dash=nm==="gold"?"":'stroke-dasharray="6 4"';
-      return `<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="none"
-              stroke="#fff" stroke-width="${w+2.5}"/>
-              <rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="none"
-              stroke="${c}" stroke-width="${w}" ${dash}/>`;
+      return `<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="none" stroke="#fff" stroke-width="${w+2.5}"/>`+
+             `<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="none" stroke="${c}" stroke-width="${w}" ${dash}/>`;
     }).join("");
     const chips=DATA.models.map(m=>{
-      const v=it.models[m].iou, hit=v>=0.5?"hit":"";
-      return `<span class="chip ${hit}" style="background:${C[m]}">${m.replace('TinyRS-','')} ${v.toFixed(2)}</span>`;
+      const v=it.models[m].iou;
+      return `<span class="chip ${v>=0.5?'hit':''}" style="background:${C[m]}">${m.replace('TinyRS-','')} ${v.toFixed(2)}</span>`;
     }).join("");
     const card=document.createElement("div"); card.className="card";
     card.innerHTML=`
       <div class="imgwrap">
+        <span class="badge" style="background:${bcol}">${blab}</span>
         <img loading="lazy" src="${it.img}" width="${it.w}" height="${it.h}" alt="">
         <svg viewBox="0 0 ${it.w} ${it.h}" preserveAspectRatio="none">${svg}</svg>
       </div>
