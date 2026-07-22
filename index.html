@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VLM aerial grounding — all 300 queries · Jetson Orin Nano 8 GB</title>
+<style>
+  :root{--navy:#123A5E;--blue:#378ADD;--light:#E9F1F8;--gold:#2ECC40;--orange:#D85A30;}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--navy);
+       background:var(--light);}
+  header{background:var(--navy);color:#fff;padding:18px 22px;}
+  header h1{margin:0 0 4px;font-size:20px;}
+  header p{margin:0;font-size:13px;opacity:.85;}
+  .bar{position:sticky;top:0;z-index:5;background:#fff;border-bottom:2px solid var(--blue);
+       padding:10px 16px;display:flex;flex-wrap:wrap;gap:14px;align-items:center;
+       box-shadow:0 2px 6px rgba(0,0,0,.06);}
+  .bar b{font-size:13px;margin-right:4px;}
+  .bar button{border:1.5px solid var(--blue);background:#fff;color:var(--navy);border-radius:16px;
+       padding:5px 13px;font-size:13px;cursor:pointer;}
+  .bar button.on{background:var(--navy);color:#fff;}
+  .bar .count{margin-left:auto;font-size:13px;color:#555;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;
+        padding:16px;}
+  .card{background:#fff;border:1.5px solid #cdd9e6;border-radius:12px;overflow:hidden;
+        display:flex;flex-direction:column;}
+  .imgwrap{position:relative;width:100%;background:#0a0a0a;}
+  .imgwrap img{width:100%;display:block;}
+  .imgwrap svg{position:absolute;inset:0;width:100%;height:100%;}
+  .meta{padding:9px 11px;}
+  .prompt{font-size:13.5px;font-weight:600;line-height:1.3;margin-bottom:7px;}
+  .tags{font-size:11px;color:#667;margin-bottom:7px;}
+  .ious{display:flex;flex-wrap:wrap;gap:6px;}
+  .chip{font-size:12px;padding:2px 8px;border-radius:10px;color:#fff;font-weight:600;}
+  .hit{outline:2px solid var(--gold);}
+  footer{padding:16px 22px;font-size:12px;color:#667;}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;align-items:center;}
+  .sw{display:inline-block;width:22px;height:4px;border-radius:2px;vertical-align:middle;margin-right:5px;}
+</style>
+</head>
+<body>
+<header>
+  <h1>Vision-Language grounding on a Jetson Orin Nano 8 GB — every query</h1>
+  <p>300 aerial queries (150 nadir · 150 oblique). For each: the request, the ground-truth box (green),
+     and what each on-device model drew. IoU shown per model; a hit is IoU ≥ 0.5.</p>
+</header>
+
+<div class="bar">
+  <b>Viewpoint</b>
+  <button data-f="vp" data-v="all" class="on">all</button>
+  <button data-f="vp" data-v="nadir">nadir</button>
+  <button data-f="vp" data-v="oblique">oblique</button>
+  <b style="margin-left:10px">Outcome</b>
+  <button data-f="oc" data-v="all" class="on">all</button>
+  <button data-f="oc" data-v="hit">any hit</button>
+  <button data-f="oc" data-v="miss">all miss</button>
+  <b style="margin-left:10px">Sort</b>
+  <button data-f="so" data-v="id" class="on">by id</button>
+  <button data-f="so" data-v="best">best first</button>
+  <button data-f="so" data-v="worst">worst first</button>
+  <span class="count" id="count"></span>
+</div>
+
+<div class="legend" style="padding:10px 16px">
+  <span><span class="sw" style="background:#2ECC40"></span>ground truth</span>
+  <span><span class="sw" style="background:#378ADD"></span>Qwen-3B (general)</span>
+  <span><span class="sw" style="background:#123A5E"></span>TinyRS-2B (specialist)</span>
+  <span><span class="sw" style="background:#D85A30"></span>TinyRS-R1 (CoT)</span>
+</div>
+
+<div class="grid" id="grid"></div>
+<footer id="foot"></footer>
+
+<script src="data.js"></script>
+<script>
+const state={vp:"all",oc:"all",so:"id"};
+const DATA=window.GALLERY;
+window.addEventListener("DOMContentLoaded",()=>{
+  render();
+  document.getElementById("foot").textContent=
+    `${DATA.n} queries · Qwen2.5-VL-3B, TinyRS-2B, TinyRS-R1 on a Jetson Orin Nano 8 GB · `+
+    `n=150 per viewpoint · qualitative results only. Full study (methods, energy, latency) to appear.`;
+});
+
+document.querySelectorAll(".bar button").forEach(b=>b.onclick=()=>{
+  const f=b.dataset.f;
+  document.querySelectorAll(`.bar button[data-f=${f}]`).forEach(x=>x.classList.remove("on"));
+  b.classList.add("on"); state[f]=b.dataset.v; render();
+});
+
+function best(it){return Math.max(...DATA.models.map(m=>it.models[m].iou));}
+
+function render(){
+  let items=DATA.items.slice();
+  if(state.vp!=="all") items=items.filter(i=>i.viewpoint===state.vp);
+  if(state.oc==="hit") items=items.filter(i=>best(i)>=0.5);
+  if(state.oc==="miss") items=items.filter(i=>best(i)<0.5);
+  if(state.so==="best") items.sort((a,b)=>best(b)-best(a));
+  else if(state.so==="worst") items.sort((a,b)=>best(a)-best(b));
+  else items.sort((a,b)=>a.id<b.id?-1:1);
+  document.getElementById("count").textContent=`${items.length} shown`;
+  const g=document.getElementById("grid"); g.innerHTML="";
+  const C=DATA.colors;
+  for(const it of items){
+    const rects=[["gold",it.gold,C.gold,4]];
+    for(const m of DATA.models){const b=it.models[m].box; if(b) rects.push([m,b,C[m],3]);}
+    const svg=rects.map(([nm,b,c,w])=>{
+      const x=Math.min(b[0],b[2]),y=Math.min(b[1],b[3]),
+            ww=Math.abs(b[2]-b[0]),hh=Math.abs(b[3]-b[1]);
+      const dash=nm==="gold"?"":'stroke-dasharray="6 4"';
+      return `<rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="none"
+              stroke="#fff" stroke-width="${w+2.5}"/>
+              <rect x="${x}" y="${y}" width="${ww}" height="${hh}" fill="none"
+              stroke="${c}" stroke-width="${w}" ${dash}/>`;
+    }).join("");
+    const chips=DATA.models.map(m=>{
+      const v=it.models[m].iou, hit=v>=0.5?"hit":"";
+      return `<span class="chip ${hit}" style="background:${C[m]}">${m.replace('TinyRS-','')} ${v.toFixed(2)}</span>`;
+    }).join("");
+    const card=document.createElement("div"); card.className="card";
+    card.innerHTML=`
+      <div class="imgwrap">
+        <img loading="lazy" src="${it.img}" width="${it.w}" height="${it.h}" alt="">
+        <svg viewBox="0 0 ${it.w} ${it.h}" preserveAspectRatio="none">${svg}</svg>
+      </div>
+      <div class="meta">
+        <div class="prompt">“${it.prompt}”</div>
+        <div class="tags">${it.viewpoint} · ${it.dataset} · ${it.cls} · ${it.id}</div>
+        <div class="ious">${chips}</div>
+      </div>`;
+    g.appendChild(card);
+  }
+}
+</script>
+</body>
+</html>
